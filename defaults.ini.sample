@@ -1,0 +1,6 @@
+[influxdb]
+host=localhost
+database=vitolink
+
+[serial]
+port=/dev/ttyUSB0
