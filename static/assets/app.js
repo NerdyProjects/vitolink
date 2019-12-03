@@ -49,6 +49,41 @@ let datapointlist =
       "address": "0x3308",
       "name": "M2 RTsollparty",
       "size": 1,
+    },
+    {
+      "address": "0x3000",
+      "name": "M2 Zeit Montag",
+      "size": 8,
+    },
+    {
+      "address": "0x3008",
+      "name": "M2 Zeit Dienstag",
+      "size": 8,
+    },
+    {
+      "address": "0x3010",
+      "name": "M2 Zeit Mittwoch",
+      "size": 8,
+    },
+    {
+      "address": "0x3018",
+      "name": "M2 Zeit Donnerstag",
+      "size": 8,
+    },
+    {
+      "address": "0x3020",
+      "name": "M2 Zeit Freitag",
+      "size": 8,
+    },
+    {
+      "address": "0x3028",
+      "name": "M2 Zeit Samstag",
+      "size": 8,
+    },
+    {
+      "address": "0x3030",
+      "name": "M2 Zeit Sonntag",
+      "size": 8,
     }
   ]
 
@@ -80,6 +115,13 @@ function swapEndianess(v) {
     len -= 2
   }
   return result.join('')
+}
+
+function getTime(v, offset) {
+  val = v.slice(offset * 2, offset * 2 + 2)
+  hour = parseInt(val, 16) >> 3
+  minute = (parseInt(val, 16) & 0x07) * 10
+  return hour + ':' + minute
 }
 
 async function start (Component, routes) {
@@ -117,6 +159,7 @@ const UDebug = {
       data: null,
       sdata: null,
       udata: null,
+      extrainfo: '',
       datapointlist: datapointlist,
     }
   },
@@ -134,9 +177,16 @@ const UDebug = {
     updateFromData() {
       data = swapEndianess(this.data)
       this.udata = parseInt(data, 16)
+      this.extrainfo = ''
+      if (this.size == 8) {
+        for (i = 0; i < 8; i++) {
+          this.extrainfo = this.extrainfo + ' ' + getTime(this.data, i)
+        }
+      }
     },
     updateFromUData() {
       this.data = swapEndianess(zeroPad(parseInt(this.udata).toString(16), 2 * this.size))
+      this.updateFromData()
     },
     updateFromEntry(entry) {
       this.address = entry.address
@@ -160,7 +210,7 @@ const UDebug = {
         </div>
 
         <div class="field">
-          <label class="label is-large">Data (Hex)</label>
+          <label class="label is-large">Data (Hex){{ extrainfo }}</label>
           <div class="control">
             <input class="input is-large" type="text" @change="updateFromData" v-model="data">
           </div>
