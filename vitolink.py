@@ -9,8 +9,6 @@ from datetime import datetime
 from influxdb import InfluxDBClient
 from flask import Flask, request, jsonify
 
-api = Flask(__name__)
-
 class OptolinkConnection:
     RESPONSE_ACK = 'ACK'
     REPONSE_NAK = 'NAK'
@@ -35,12 +33,10 @@ class OptolinkConnection:
                 raise Exception('Communication error: InitVS2 mode failed')
 
     def tx(self, payload):
-        self.check_connection()
         self.connection.write(payload)
         #print('wrote', payload)
 
     def rx(self, length):
-        self.check_connection()
         response = self.connection.read(length)
         #if len(response) == 0:
         #    raise Exception('Timeout')
@@ -73,6 +69,7 @@ class OptolinkConnection:
         return success
 
     def sendTelegram(self, payload):
+        self.check_connection()
         length = len(payload)
         checksum = (sum(payload) + length) % 256
         telegram = struct.pack('BB', 0x41, length)
@@ -92,6 +89,7 @@ class OptolinkConnection:
             return OptolinkConnection.RESPONSE_UNKNOWN        
 
     def readTelegram(self):
+        self.check_connection()
         if self.readAck() != OptolinkConnection.RESPONSE_ACK:
             # Transfer error: Reinit connection and abort this transfer
             self.initVS2()
@@ -177,6 +175,12 @@ class Transformations:
     def int64ToInt(v):
         return (struct.unpack('<q', v))[0]
 
+
+api = Flask(__name__)
+config = configparser.ConfigParser()
+config.read(os.path.join(os.path.dirname(__file__), 'defaults.ini'))
+optolink = OptolinkConnection(config.get('serial', 'port'))
+
 @api.route('/api/<address>', methods=['GET', 'POST'])
 def access(address):
     address = int(address, 16)
@@ -244,16 +248,11 @@ def influxdb_log(optolink, influx):
         time.sleep(5)
 
 def main():
-    config = configparser.ConfigParser()
-    config.read(os.path.join(os.path.dirname(__file__), 'defaults.ini'))
-
     influx = InfluxDBClient(host=config.get('influxdb', 'host'), port=8086, username='', password='', database=config.get('influxdb', 'database'), ssl=False, verify_ssl=False, retries=20, timeout=60)
-
-    optolink = OptolinkConnection(config.get('serial', 'port'))
 
     influxdb_log_thread = threading.Thread(None, influxdb_log, "InfluxDB-Log", (optolink, influx))
     influxdb_log_thread.start()
-    api.run(debug=True)
+    api.run(host='0.0.0.0', debug=False)
 
 
 if __name__ == '__main__':
